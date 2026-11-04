@@ -1,0 +1,6 @@
+{
+  "name": "FinanceControl",
+  "description": "Controle financeiro pessoal e familiar simples, acolhedor e organizado para gerenciar ganhos, gastos, objetivos e categorias do lar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
