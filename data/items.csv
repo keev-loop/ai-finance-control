@@ -1,0 +1,7 @@
+id,titulo,descricao,categoriaId,valor,data,tipo,status,responsavel,criadoEm,atualizadoEm
+item-1,"Salário Mensal","Recebimento do salário principal da casa",cat-housing,12500,2023-07-07,ganho,recebido,"Lucas Silva",2023-07-07T12:00:00.000Z,2023-07-07T12:00:00.000Z
+item-2,"Mercado do Mês","Compras de supermercado e despensa familiar",cat-food,8950,2023-07-07,gasto,pago,"Família",2023-07-07T12:00:00.000Z,2023-07-07T12:00:00.000Z
+item-3,"Depósito p/ Viagem","Meta de economia para férias de fim de ano da família",cat-travel,11500,2023-02-17,objetivo,em_andamento,"Família Silva",2023-02-17T12:00:00.000Z,2023-02-17T12:00:00.000Z
+item-4,"Freelance Design","Consultoria e projeto extra de design de interfaces",cat-others,1500,2023-07-10,ganho,recebido,"Lucas Silva",2023-07-10T12:00:00.000Z,2023-07-10T12:00:00.000Z
+item-5,"Almoço Sábado","Almoço com a família fora de casa",cat-food,122,2023-07-15,gasto,pago,"Lucas & Mariana",2023-07-15T12:00:00.000Z,2023-07-15T12:00:00.000Z
+item-6,"Reserva de Emergência 6 Meses","Fundo garantidor familiar aplicado com liquidez diária",cat-housing,10000,2023-12-31,objetivo,em_andamento,"Todos da casa",2023-12-31T12:00:00.000Z,2023-12-31T12:00:00.000Z

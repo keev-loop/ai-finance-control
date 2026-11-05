@@ -1,22 +1,28 @@
 import React from 'react';
 import { UserProfile, ActiveView } from '../types/finance';
-import { Menu, ChevronDown, PlusCircle } from 'lucide-react';
+import { Menu, ChevronDown, PlusCircle, Cloud, RefreshCw } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 
 interface TopHeaderProps {
   user: UserProfile;
   activeView: ActiveView;
+  isDriveConnected?: boolean;
+  isDriveSyncing?: boolean;
   onOpenMobileMenu: () => void;
   onNavigateToAccount: () => void;
   onOpenNewItem: () => void;
+  onSyncDrive?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
   user,
   activeView,
+  isDriveConnected = false,
+  isDriveSyncing = false,
   onOpenMobileMenu,
   onNavigateToAccount,
   onOpenNewItem,
+  onSyncDrive,
 }) => {
   const getViewTitle = () => {
     switch (activeView) {
@@ -65,9 +71,40 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </div>
       </div>
 
-      {/* Right side: Quick Add button + User profile badge matching Screen 1 */}
-      <div className="flex items-center gap-3">
+      {/* Right side: Google Drive Sync + Quick Add + User profile */}
+      <div className="flex items-center gap-2.5 sm:gap-3">
         
+        {/* Google Drive Status & Sync Button */}
+        {onSyncDrive && (
+          <button
+            onClick={onSyncDrive}
+            disabled={isDriveSyncing}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+              isDriveConnected
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
+            }`}
+            title={
+              isDriveConnected
+                ? 'Sincronizar dados com o Google Drive'
+                : 'Conectar ao Google Drive para salvar os arquivos CSV'
+            }
+          >
+            {isDriveSyncing ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-700" />
+            ) : (
+              <Cloud className={`w-3.5 h-3.5 ${isDriveConnected ? 'text-emerald-700' : 'text-stone-500'}`} />
+            )}
+            <span className="hidden sm:inline">
+              {isDriveSyncing
+                ? 'Sincronizando...'
+                : isDriveConnected
+                ? 'Google Drive'
+                : 'Conectar Drive'}
+            </span>
+          </button>
+        )}
+
         {/* Quick Add button */}
         <button
           onClick={onOpenNewItem}
@@ -77,7 +114,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <span>Novo Item</span>
         </button>
 
-        {/* User Profile Pill matching Screen 1: Avatar + "Lucas S." + Google G badge */}
+        {/* User Profile Pill */}
         <button
           onClick={onNavigateToAccount}
           className="flex items-center gap-2.5 p-1 pl-2.5 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl transition-all cursor-pointer group"
@@ -94,7 +131,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               alt={user.nome}
               className="w-8 h-8 rounded-full object-cover ring-2 ring-white"
             />
-            {/* Google Icon Badge in corner */}
             {user.provider === 'google' && (
               <span className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-2xs border border-stone-200">
                 <svg className="w-3 h-3" viewBox="0 0 24 24">

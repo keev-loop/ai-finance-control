@@ -1,11 +1,17 @@
 import { FinanceCategory, FinanceItem, UserProfile } from '../types/finance';
+import {
+  csvToCategories,
+  csvToItems,
+  categoriesToCSV,
+  itemsToCSV,
+} from '../utils/csvParser';
 
 const STORAGE_KEYS = {
-  CATEGORIES: 'financecontrol_categories_v2',
-  ITEMS: 'financecontrol_items_v2',
-  INITIALIZED: 'financecontrol_initialized_v2',
-  USER_PROFILE: 'financecontrol_user_profile_v2',
-  AUTH_LOGGED_IN: 'financecontrol_auth_logged_in_v2',
+  CATEGORIES_CSV: 'financecontrol_categories_csv_v3',
+  ITEMS_CSV: 'financecontrol_items_csv_v3',
+  INITIALIZED: 'financecontrol_csv_initialized_v3',
+  USER_PROFILE: 'financecontrol_user_profile_v3',
+  AUTH_LOGGED_IN: 'financecontrol_auth_logged_in_v3',
 };
 
 export const DEFAULT_USER: UserProfile = {
@@ -25,7 +31,7 @@ export const DEFAULT_CATEGORIES: FinanceCategory[] = [
     id: 'cat-food',
     nome: 'Food / Alimentação',
     cor: '#e11d48',
-    corFundo: '#ffe4e6', // pastel pink
+    corFundo: '#ffe4e6',
     icone: 'utensils',
     descricao: 'Compras de supermercado, feira, refeições e padaria',
     criadaEm: new Date().toISOString(),
@@ -34,7 +40,7 @@ export const DEFAULT_CATEGORIES: FinanceCategory[] = [
     id: 'cat-housing',
     nome: 'Housing / Moradia',
     cor: '#ea580c',
-    corFundo: '#ffedd5', // pastel peach
+    corFundo: '#ffedd5',
     icone: 'home',
     descricao: 'Aluguel, condomínio, luz, água, gás e internet',
     criadaEm: new Date().toISOString(),
@@ -43,7 +49,7 @@ export const DEFAULT_CATEGORIES: FinanceCategory[] = [
     id: 'cat-travel',
     nome: 'Travel / Viagens',
     cor: '#0284c7',
-    corFundo: '#e0f2fe', // pastel sky blue
+    corFundo: '#e0f2fe',
     icone: 'plane',
     descricao: 'Passagens, hospedagem e passeios de férias da família',
     criadaEm: new Date().toISOString(),
@@ -52,7 +58,7 @@ export const DEFAULT_CATEGORIES: FinanceCategory[] = [
     id: 'cat-leisure',
     nome: 'Leisure / Lazer',
     cor: '#16a34a',
-    corFundo: '#dcfce7', // pastel mint green
+    corFundo: '#dcfce7',
     icone: 'gamepad-2',
     descricao: 'Cinemas, jogos, streaming e diversão familiar',
     criadaEm: new Date().toISOString(),
@@ -61,7 +67,7 @@ export const DEFAULT_CATEGORIES: FinanceCategory[] = [
     id: 'cat-education',
     nome: 'Education / Educação',
     cor: '#7c3aed',
-    corFundo: '#f3e8ff', // pastel lavender
+    corFundo: '#f3e8ff',
     icone: 'graduation-cap',
     descricao: 'Mensalidades escolares, cursos, faculdade e livros',
     criadaEm: new Date().toISOString(),
@@ -70,7 +76,7 @@ export const DEFAULT_CATEGORIES: FinanceCategory[] = [
     id: 'cat-health',
     nome: 'Health / Saúde',
     cor: '#dc2626',
-    corFundo: '#fee2e2', // pastel soft red
+    corFundo: '#fee2e2',
     icone: 'heart-pulse',
     descricao: 'Farmácia, consultas médicas e plano de saúde',
     criadaEm: new Date().toISOString(),
@@ -79,7 +85,7 @@ export const DEFAULT_CATEGORIES: FinanceCategory[] = [
     id: 'cat-relax',
     nome: 'Relax / Bem-Estar',
     cor: '#9333ea',
-    corFundo: '#fae8ff', // pastel lilac
+    corFundo: '#fae8ff',
     icone: 'sparkles',
     descricao: 'Autocuidado, academia e descanso',
     criadaEm: new Date().toISOString(),
@@ -88,7 +94,7 @@ export const DEFAULT_CATEGORIES: FinanceCategory[] = [
     id: 'cat-others',
     nome: 'Others / Outros',
     cor: '#be123c',
-    corFundo: '#ffe4e6', // pastel salmon
+    corFundo: '#ffe4e6',
     icone: 'briefcase',
     descricao: 'Despesas diversas e imprevistos cotidianos',
     criadaEm: new Date().toISOString(),
@@ -181,79 +187,111 @@ class StorageService {
     return typeof window !== 'undefined' && !!window.localStorage;
   }
 
+  // Initialize CSV storage
   public initialize(): void {
     if (!this.isBrowser()) return;
 
     const initialized = localStorage.getItem(STORAGE_KEYS.INITIALIZED);
     if (!initialized) {
-      this.saveCategories(DEFAULT_CATEGORIES);
-      this.saveItems(DEFAULT_ITEMS);
+      // Save initial CSV strings
+      this.saveCategoriesCSV(categoriesToCSV(DEFAULT_CATEGORIES));
+      this.saveItemsCSV(itemsToCSV(DEFAULT_ITEMS));
       this.saveUserProfile(DEFAULT_USER);
       this.setLoggedIn(true);
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
     }
+
+    // Try background sync with backend /api/items and /api/categories if available
+    this.syncWithBackend();
   }
 
-  // --- AUTH & USER PROFILE ---
-  public isLoggedIn(): boolean {
-    if (!this.isBrowser()) return true;
-    const val = localStorage.getItem(STORAGE_KEYS.AUTH_LOGGED_IN);
-    return val !== null ? val === 'true' : true; // Default logged in for smooth immediate preview
-  }
-
-  public setLoggedIn(loggedIn: boolean): void {
-    if (!this.isBrowser()) return;
-    localStorage.setItem(STORAGE_KEYS.AUTH_LOGGED_IN, String(loggedIn));
-  }
-
-  public getUserProfile(): UserProfile {
-    if (!this.isBrowser()) return DEFAULT_USER;
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
-      return data ? JSON.parse(data) : DEFAULT_USER;
-    } catch {
-      return DEFAULT_USER;
-    }
-  }
-
-  public saveUserProfile(profile: UserProfile): void {
+  // Try to sync with server CSV database
+  public async syncWithBackend(): Promise<void> {
     if (!this.isBrowser()) return;
     try {
-      localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
-    } catch (e) {
-      console.error('Erro ao salvar perfil do usuário:', e);
-    }
-  }
-
-  // --- CATEGORIES ---
-  public getCategories(): FinanceCategory[] {
-    if (!this.isBrowser()) return DEFAULT_CATEGORIES;
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
-      if (!data) {
-        this.saveCategories(DEFAULT_CATEGORIES);
-        return DEFAULT_CATEGORIES;
+      const res = await fetch('/api/items');
+      if (res.ok) {
+        const items = await res.json();
+        if (Array.isArray(items) && items.length > 0) {
+          this.saveItemsCSV(itemsToCSV(items));
+        }
       }
-      return JSON.parse(data) as FinanceCategory[];
+      const catRes = await fetch('/api/categories');
+      if (catRes.ok) {
+        const cats = await catRes.json();
+        if (Array.isArray(cats) && cats.length > 0) {
+          this.saveCategoriesCSV(categoriesToCSV(cats));
+        }
+      }
     } catch {
-      return DEFAULT_CATEGORIES;
+      // Offline or client-only mode, uses local CSV storage
     }
+  }
+
+  // --- RAW CSV ACCESS ---
+  public getRawItemsCSV(): string {
+    if (!this.isBrowser()) return itemsToCSV(DEFAULT_ITEMS);
+    const data = localStorage.getItem(STORAGE_KEYS.ITEMS_CSV);
+    if (!data) {
+      const initial = itemsToCSV(DEFAULT_ITEMS);
+      this.saveItemsCSV(initial);
+      return initial;
+    }
+    return data;
+  }
+
+  public saveItemsCSV(csvText: string): void {
+    if (!this.isBrowser()) return;
+    localStorage.setItem(STORAGE_KEYS.ITEMS_CSV, csvText);
+
+    // Sync to backend CSV file if server is running
+    fetch('/api/csv/raw/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: csvText,
+    }).catch(() => {});
+  }
+
+  public getRawCategoriesCSV(): string {
+    if (!this.isBrowser()) return categoriesToCSV(DEFAULT_CATEGORIES);
+    const data = localStorage.getItem(STORAGE_KEYS.CATEGORIES_CSV);
+    if (!data) {
+      const initial = categoriesToCSV(DEFAULT_CATEGORIES);
+      this.saveCategoriesCSV(initial);
+      return initial;
+    }
+    return data;
+  }
+
+  public saveCategoriesCSV(csvText: string): void {
+    if (!this.isBrowser()) return;
+    localStorage.setItem(STORAGE_KEYS.CATEGORIES_CSV, csvText);
+
+    // Sync to backend CSV file if server is running
+    fetch('/api/csv/raw/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: csvText,
+    }).catch(() => {});
+  }
+
+  // --- CATEGORIES (Parsed from CSV) ---
+  public getCategories(): FinanceCategory[] {
+    const csv = this.getRawCategoriesCSV();
+    const parsed = csvToCategories(csv);
+    return parsed.length > 0 ? parsed : DEFAULT_CATEGORIES;
   }
 
   public saveCategories(categories: FinanceCategory[]): void {
-    if (!this.isBrowser()) return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
-    } catch (e) {
-      console.error('Erro ao salvar categorias no localStorage:', e);
-    }
+    const csv = categoriesToCSV(categories);
+    this.saveCategoriesCSV(csv);
   }
 
   public addCategory(cat: Omit<FinanceCategory, 'id' | 'criadaEm'>): FinanceCategory {
     const categories = this.getCategories();
     const newCategory: FinanceCategory = {
       ...cat,
-      id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       criadaEm: new Date().toISOString(),
     };
     categories.push(newCategory);
@@ -284,7 +322,7 @@ class StorageService {
     this.saveCategories(filtered);
 
     const items = this.getItems();
-    const fallbackCategory = filtered[0]?.id || 'cat-food';
+    const fallbackCategory = filtered[0]?.id || 'cat-others';
     let countReassigned = 0;
 
     const updatedItems = items.map((item) => {
@@ -302,35 +340,23 @@ class StorageService {
     return { success: true, countReassigned };
   }
 
-  // --- ITEMS ---
+  // --- ITEMS (Parsed from CSV) ---
   public getItems(): FinanceItem[] {
-    if (!this.isBrowser()) return DEFAULT_ITEMS;
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.ITEMS);
-      if (!data) {
-        this.saveItems(DEFAULT_ITEMS);
-        return DEFAULT_ITEMS;
-      }
-      return JSON.parse(data) as FinanceItem[];
-    } catch {
-      return DEFAULT_ITEMS;
-    }
+    const csv = this.getRawItemsCSV();
+    const parsed = csvToItems(csv);
+    return parsed.length > 0 ? parsed : DEFAULT_ITEMS;
   }
 
   public saveItems(items: FinanceItem[]): void {
-    if (!this.isBrowser()) return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(items));
-    } catch (e) {
-      console.error('Erro ao salvar itens no localStorage:', e);
-    }
+    const csv = itemsToCSV(items);
+    this.saveItemsCSV(csv);
   }
 
   public addItem(item: Omit<FinanceItem, 'id' | 'criadoEm' | 'atualizadoEm'>): FinanceItem {
     const items = this.getItems();
     const newItem: FinanceItem = {
       ...item,
-      id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       criadoEm: new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
     };
@@ -361,41 +387,102 @@ class StorageService {
     return true;
   }
 
-  public resetToDefaults(): void {
-    if (!this.isBrowser()) return;
-    this.saveCategories(DEFAULT_CATEGORIES);
-    this.saveItems(DEFAULT_ITEMS);
-    this.saveUserProfile(DEFAULT_USER);
-    this.setLoggedIn(true);
+  // --- AUTH & USER PROFILE ---
+  public isLoggedIn(): boolean {
+    if (!this.isBrowser()) return true;
+    const val = localStorage.getItem(STORAGE_KEYS.AUTH_LOGGED_IN);
+    return val !== null ? val === 'true' : true;
   }
 
+  public setLoggedIn(loggedIn: boolean): void {
+    if (!this.isBrowser()) return;
+    localStorage.setItem(STORAGE_KEYS.AUTH_LOGGED_IN, String(loggedIn));
+  }
+
+  public getUserProfile(): UserProfile {
+    if (!this.isBrowser()) return DEFAULT_USER;
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+      return data ? JSON.parse(data) : DEFAULT_USER;
+    } catch {
+      return DEFAULT_USER;
+    }
+  }
+
+  public saveUserProfile(profile: UserProfile): void {
+    if (!this.isBrowser()) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
+    } catch (e) {
+      console.error('Erro ao salvar perfil do usuário:', e);
+    }
+  }
+
+  // --- CSV DOWNLOAD HELPERS ---
+  public downloadCSVFile(type: 'items' | 'categories'): void {
+    const csvContent = type === 'items' ? this.getRawItemsCSV() : this.getRawCategoriesCSV();
+    const filename = type === 'items' ? 'items.csv' : 'categories.csv';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  // Export complete JSON backup
   public exportData(): string {
     const payload = {
-      version: 2,
-      appName: 'Família Finanças (FinanceControl)',
+      version: 3,
+      storageEngine: 'CSV_DATABASE',
+      appName: 'Família Finanças',
       exportedAt: new Date().toISOString(),
       user: this.getUserProfile(),
+      categoriesCSV: this.getRawCategoriesCSV(),
+      itemsCSV: this.getRawItemsCSV(),
       categories: this.getCategories(),
       items: this.getItems(),
     };
     return JSON.stringify(payload, null, 2);
   }
 
+  // Import complete JSON backup
   public importData(jsonData: string): boolean {
     try {
       const parsed = JSON.parse(jsonData);
-      if (Array.isArray(parsed.categories) && Array.isArray(parsed.items)) {
-        this.saveCategories(parsed.categories);
+      if (parsed.itemsCSV) {
+        this.saveItemsCSV(parsed.itemsCSV);
+      } else if (Array.isArray(parsed.items)) {
         this.saveItems(parsed.items);
-        if (parsed.user) {
-          this.saveUserProfile(parsed.user);
-        }
-        return true;
       }
-      return false;
+
+      if (parsed.categoriesCSV) {
+        this.saveCategoriesCSV(parsed.categoriesCSV);
+      } else if (Array.isArray(parsed.categories)) {
+        this.saveCategories(parsed.categories);
+      }
+
+      if (parsed.user) {
+        this.saveUserProfile(parsed.user);
+      }
+      return true;
     } catch {
       return false;
     }
+  }
+
+  // Reset to default CSV tables
+  public resetToDefaults(): void {
+    if (!this.isBrowser()) return;
+    this.saveCategoriesCSV(categoriesToCSV(DEFAULT_CATEGORIES));
+    this.saveItemsCSV(itemsToCSV(DEFAULT_ITEMS));
+    this.saveUserProfile(DEFAULT_USER);
+    this.setLoggedIn(true);
+
+    fetch('/api/reset', { method: 'POST' }).catch(() => {});
   }
 }
 

@@ -3,6 +3,62 @@
 
 ---
 
+## 💾 6.1 Arquitetura do Banco de Dados em Arquivos CSV
+
+A aplicação foi estruturada para operar com um **banco de dados baseado em arquivos CSV** em disco (`/data/items.csv` e `/data/categories.csv`), suportando persistência bidirecional com conformidade RFC 4180.
+
+### 📁 Estrutura das Tabelas CSV
+
+#### 1. Tabela de Lançamentos (`data/items.csv`)
+```csv
+id,titulo,descricao,categoriaId,valor,data,tipo,status,responsavel,criadoEm,atualizadoEm
+item-1,"Salário Mensal","Recebimento do salário principal da casa",cat-housing,12500,2023-07-07,ganho,recebido,"Lucas Silva",2023-07-07T12:00:00.000Z,2023-07-07T12:00:00.000Z
+item-2,"Mercado do Mês","Compras de supermercado e despensa familiar",cat-food,8950,2023-07-07,gasto,pago,"Família",2023-07-07T12:00:00.000Z,2023-07-07T12:00:00.000Z
+```
+
+#### 2. Tabela de Categorias (`data/categories.csv`)
+```csv
+id,nome,cor,corFundo,icone,descricao,criadaEm
+cat-food,"Food / Alimentação",#e11d48,#ffe4e6,utensils,"Compras de supermercado, feira, refeições e padaria",2023-07-07T12:00:00.000Z
+cat-housing,"Housing / Moradia",#ea580c,#ffedd5,home,"Aluguel, condomínio, luz, água, gás e internet",2023-07-07T12:00:00.000Z
+```
+
+### 🔌 Endpoints do Servidor Express (`server.ts`)
+- `GET /api/items`: Retorna todos os itens lidos e desserializados diretamente de `data/items.csv`.
+- `POST /api/items`: Insere novo item e regrava o arquivo `data/items.csv`.
+- `PUT /api/items/:id`: Atualiza registro existente no arquivo CSV.
+- `DELETE /api/items/:id`: Remove o registro do arquivo CSV.
+- `GET /api/categories`: Retorna todas as categorias lidas de `data/categories.csv`.
+- `POST /api/categories`: Cadastra nova categoria no arquivo CSV.
+- `PUT /api/categories/:id`: Atualiza a categoria no arquivo CSV.
+- `DELETE /api/categories/:id`: Exclui a categoria e realoca itens órfãos no CSV.
+- `GET /api/csv/download/:type`: Baixa o arquivo `.csv` bruto diretamente para a máquina do usuário.
+- `GET /api/csv/raw/:type` & `POST /api/csv/raw/:type`: Leitura e substituição do conteúdo bruto do arquivo CSV via interface.
+- `POST /api/reset`: Restaura os arquivos CSV originais da família.
+
+---
+
+## ☁️ 6.2 Integração e Persistência Direta no Google Drive
+
+A aplicação oferece integração oficial com o **Google Drive** do usuário para gravação e leitura direta dos arquivos de dados:
+
+### 🔑 Autenticação e Segurança
+- **OAuth 2.0 com Google**: Acesso concedido pelo próprio usuário com o escopo de menor privilégio `https://www.googleapis.com/auth/drive.file`.
+- **Privacidade e Isolamento**: A aplicação acessa e gerencia exclusivamente os arquivos que ela própria cria, sem permissão sobre os outros documentos do seu Google Drive.
+- **Tokens em Memória**: O token de acesso OAuth é retido estritamente em memória volátil durante a sessão ativa, sem armazenamento no `localStorage` ou `sessionStorage`, prevenindo vazamentos de credenciais.
+
+### 📂 Organização no Google Drive
+- **Pasta Dedicada**: Cria e localiza automaticamente a pasta `FinanceControl - Família Finanças` na raiz do Drive.
+- **Tabela de Lançamentos**: Arquivo `items.csv` sincronizado com data, título, categoria, valor e status de cada transação familiar.
+- **Tabela de Categorias**: Arquivo `categories.csv` sincronizado com identificadores, nomes e cores pastéis.
+
+### 🔄 Fluxos de Operação
+1. **Leitura do Drive (`GET`)**: Baixa os arquivos mais recentes via endpoint `drive/v3/files/{id}?alt=media` e atualiza a interface instantaneamente.
+2. **Gravação no Drive (`POST` / `PATCH`)**:
+   - Criação via multipart upload (`/upload/drive/v3/files?uploadType=multipart`).
+   - Atualização de conteúdo existente via stream direto (`uploadType=media`).
+3. **Modal de Confirmação Explícita**: Antes de qualquer gravação ou substituição de arquivos no Google Drive, um modal de segurança exibe os arquivos afetados e a quantidade de linhas que serão gravadas, exigindo confirmação explícita do usuário.
+
 ## 📌 1. Visão Geral da Aplicação
 
 O **FinanceControl** é uma aplicação web desenvolvida para ajudar famílias e pessoas que dividem a mesma moradia a organizarem suas finanças de forma colaborativa, clara e sem atritos.
@@ -10,12 +66,14 @@ O **FinanceControl** é uma aplicação web desenvolvida para ajudar famílias e
 Muitas ferramentas financeiras tradicionais são excessivamente complexas ou focadas apenas em orçamentos individuais corporativos. O FinanceControl foi projetado com um visual acolhedor, linguagem em português do Brasil e foco na rotina da casa: divisão de contas, controle de ganhos, despesas mensais e metas para o futuro da família (reserva de emergência, reformas, férias e educação).
 
 ### Principais Benefícios:
+- **Banco de Dados em Arquivos CSV:** Todos os dados são lidos e gravados em arquivos CSV (`data/items.csv` e `data/categories.csv`), funcionando exatamente como tabelas de um banco de dados relacional em formato aberto.
+- **Visualizador e Editor de CSV Integrado:** A tela de conta permite inspecionar, editar manualmente, baixar e fazer upload direto dos arquivos CSV.
 - **Autenticação com Google & Email:** Tela de login elegante com botão oficial "Continue with Google" e fallback por email/senha.
 - **Identidade e Perfil Conectado:** Identificação visual do usuário no topo (Avatar, Nome "Lucas S." e selo oficial do Google).
 - **Tela de Conta do Usuário:** Gestão completa do perfil, moradia ("Família Silva"), membros cadastrados, papel no lar e backups.
 - **Menu Lateral e Navegação Responsiva:** Sidebar completa no desktop (Início, Ganhos, Gastos, Objetivos, Categorias, Relatórios, Conta, Sair) e navegação mobile com botão flutuante "+".
 - **Visual Fiel ao Design (Família Finanças):** Grade de categorias com cartões em tons pastéis e ícones temáticos (Food, Housing, Travel, Leisure, Education, etc.).
-- **100% Client-Side:** Persistência no `localStorage` do navegador com privacidade total e sem necessidade de backend inicial.
+- **Persistência Híbrida & Offline:** Sincronização contínua entre a API do servidor e o armazenamento local em formato CSV.
 
 ---
 
@@ -86,6 +144,7 @@ Muitas ferramentas financeiras tradicionais são excessivamente complexas ou foc
 | **TypeScript** | `^7.0.2` | Tipagem estática rigorosa para garantir segurança nos dados, contratos e prevenção de bugs. |
 | **Vite** | `^8.3.0` | Ferramenta de build e servidor de desenvolvimento ultrarrápido com hot reload otimizado. |
 | **Tailwind CSS** | `^4.3.3` | Framework CSS utilitário para design acolhedor, responsivo e sem excesso de código customizado. |
+| **Recharts** | `^2.15.1` | Biblioteca de gráficos vetoriais interativos para renderização da evolução do saldo mensal. |
 | **Lucide React** | `^0.546.0` | Conjunto consistente e moderno de ícones de interface semânticos e leves. |
 | **Web Storage API (localStorage)** | Nativo | Persistência local no cliente, garantindo privacidade e disponibilidade offline. |
 | **Intl API (pt-BR)** | Nativo | Formatação nativa de moeda brasileira (`R$`) e datas sem dependências externas pesadas. |

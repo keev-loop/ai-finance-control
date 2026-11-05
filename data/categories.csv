@@ -1,0 +1,9 @@
+id,nome,cor,corFundo,icone,descricao,criadaEm
+cat-food,"Food / Alimentação",#e11d48,#ffe4e6,utensils,"Compras de supermercado, feira, refeições e padaria",2023-07-07T12:00:00.000Z
+cat-housing,"Housing / Moradia",#ea580c,#ffedd5,home,"Aluguel, condomínio, luz, água, gás e internet",2023-07-07T12:00:00.000Z
+cat-travel,"Travel / Viagens",#0284c7,#e0f2fe,plane,"Passagens, hospedagem e passeios de férias da família",2023-07-07T12:00:00.000Z
+cat-leisure,"Leisure / Lazer",#16a34a,#dcfce7,gamepad-2,"Cinemas, jogos, streaming e diversão familiar",2023-07-07T12:00:00.000Z
+cat-education,"Education / Educação",#7c3aed,#f3e8ff,graduation-cap,"Mensalidades escolares, cursos, faculdade e livros",2023-07-07T12:00:00.000Z
+cat-health,"Health / Saúde",#dc2626,#fee2e2,heart-pulse,"Farmácia, consultas médicas e plano de saúde",2023-07-07T12:00:00.000Z
+cat-relax,"Relax / Bem-Estar",#9333ea,#fae8ff,sparkles,"Autocuidado, academia e descanso",2023-07-07T12:00:00.000Z
+cat-others,"Others / Outros",#be123c,#ffe4e6,briefcase,"Despesas diversas e imprevistos cotidianos",2023-07-07T12:00:00.000Z

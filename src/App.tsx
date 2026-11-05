@@ -9,9 +9,23 @@ import { UserAccountScreen } from './components/UserAccountScreen';
 import { NewItemModal } from './components/NewItemModal';
 import { CategoryFormModal } from './components/CategoryFormModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
+import { FinancialReports } from './components/FinancialReports';
+import { CsvViewerModal } from './components/CsvViewerModal';
+import { DriveSyncConfirmModal } from './components/DriveSyncConfirmModal';
 import { AlertBanner } from './components/AlertBanner';
 import { MobileNav } from './components/MobileNav';
 import { storageService } from './services/storageService';
+import {
+  initDriveAuth,
+  googleSignInWithDrive,
+  getDriveAccessToken,
+  isDriveAuthenticated,
+  driveSignOut,
+} from './services/googleDriveAuth';
+import {
+  loadDatabaseFromDrive,
+  saveDatabaseToDrive,
+} from './services/googleDriveService';
 import {
   ActiveView,
   FinanceCategory,
@@ -19,8 +33,8 @@ import {
   ItemType,
   UserProfile,
 } from './types/finance';
-import { CheckCircle2, TrendingUp, TrendingDown, Target, Wallet } from 'lucide-react';
-import { formatCurrency } from './utils/formatters';
+import { CheckCircle2 } from 'lucide-react';
+import { itemsToCSV, categoriesToCSV } from './utils/csvParser';
 
 export default function App() {
   // Authentication & Profile State
@@ -57,6 +71,21 @@ export default function App() {
   // Feedback Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // CSV Database Viewer Modal State
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+  const [csvModalType, setCsvModalType] = useState<'items' | 'categories'>('items');
+  const [rawCsvText, setRawCsvText] = useState('');
+
+  // Google Drive State
+  const [isDriveConnected, setIsDriveConnected] = useState<boolean>(false);
+  const [isDriveSyncing, setIsDriveSyncing] = useState<boolean>(false);
+  const [isDriveSaving, setIsDriveSaving] = useState<boolean>(false);
+  const [isDriveConfirmModalOpen, setIsDriveConfirmModalOpen] = useState<boolean>(false);
+  const [driveFolderUrl, setDriveFolderUrl] = useState<string | undefined>();
+  const [driveItemsFileId, setDriveItemsFileId] = useState<string | undefined>();
+  const [driveCategoriesFileId, setDriveCategoriesFileId] = useState<string | undefined>();
+  const [lastDriveSync, setLastDriveSync] = useState<string | undefined>();
+
   // Hidden File input for backup
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,25 +96,60 @@ export default function App() {
     setItems(storageService.getItems());
     setUser(storageService.getUserProfile());
     setIsLoggedIn(storageService.isLoggedIn());
+
+    // Initialize Firebase Drive Auth state listener
+    const unsubscribe = initDriveAuth(
+      (driveUser, token) => {
+        setIsDriveConnected(true);
+        if (driveUser.email && !user.email) {
+          const updated: UserProfile = {
+            ...user,
+            email: driveUser.email,
+            nome: driveUser.displayName || user.nome,
+            avatarUrl: driveUser.photoURL || user.avatarUrl,
+            provider: 'google',
+          };
+          setUser(updated);
+          storageService.saveUserProfile(updated);
+        }
+        // Auto-sync from drive on start if token is ready
+        autoSyncFromDrive(token);
+      },
+      () => {
+        setIsDriveConnected(isDriveAuthenticated());
+      }
+    );
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage((prev) => (prev === msg ? null : prev));
-    }, 3200);
+    }, 3500);
   };
 
   // Auth Handlers
-  const handleLoginSuccess = (loggedInUser: UserProfile) => {
+  const handleLoginSuccess = async (loggedInUser: UserProfile) => {
     setUser(loggedInUser);
     setIsLoggedIn(true);
     storageService.saveUserProfile(loggedInUser);
     storageService.setLoggedIn(true);
+
+    const token = getDriveAccessToken();
+    if (token) {
+      setIsDriveConnected(true);
+      await autoSyncFromDrive(token);
+    }
     showToast(`Bem-vindo, ${loggedInUser.nome}!`);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await driveSignOut();
+    setIsDriveConnected(false);
     setIsLoggedIn(false);
     storageService.setLoggedIn(false);
     showToast('Você saiu da sua conta.');
@@ -95,6 +159,150 @@ export default function App() {
     setUser(updated);
     storageService.saveUserProfile(updated);
     showToast('Perfil do usuário atualizado com sucesso.');
+  };
+
+  // ==========================================
+  // GOOGLE DRIVE SYNC WORKFLOW
+  // ==========================================
+
+  const autoSyncFromDrive = async (token: string) => {
+    try {
+      setIsDriveSyncing(true);
+      const driveData = await loadDatabaseFromDrive(token);
+      if (driveData && (driveData.items.length > 0 || driveData.categories.length > 0)) {
+        if (driveData.items.length > 0) {
+          storageService.saveItemsCSV(driveData.itemsCSV);
+          setItems(driveData.items);
+        }
+        if (driveData.categories.length > 0) {
+          storageService.saveCategoriesCSV(driveData.categoriesCSV);
+          setCategories(driveData.categories);
+        }
+        setDriveFolderUrl(driveData.folderWebViewLink);
+        setDriveItemsFileId(driveData.itemsFileId);
+        setDriveCategoriesFileId(driveData.categoriesFileId);
+        setLastDriveSync(driveData.syncTimestamp);
+      }
+    } catch (e) {
+      console.warn('Sincronização inicial do Google Drive em segundo plano:', e);
+    } finally {
+      setIsDriveSyncing(false);
+    }
+  };
+
+  const handleConnectDrive = async () => {
+    try {
+      setIsDriveSyncing(true);
+      const result = await googleSignInWithDrive();
+      if (result) {
+        setIsDriveConnected(true);
+        const updatedUser: UserProfile = {
+          ...user,
+          email: result.user.email || user.email,
+          nome: result.user.displayName || user.nome,
+          avatarUrl: result.user.photoURL || user.avatarUrl,
+          provider: 'google',
+        };
+        setUser(updatedUser);
+        storageService.saveUserProfile(updatedUser);
+
+        showToast('Google Drive conectado! Carregando arquivos CSV...');
+        await handleLoadFromDrive();
+      }
+    } catch (err: any) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        showToast('Não foi possível conectar ao Google Drive.');
+      }
+    } finally {
+      setIsDriveSyncing(false);
+    }
+  };
+
+  const handleLoadFromDrive = async () => {
+    const token = getDriveAccessToken();
+    if (!token) {
+      await handleConnectDrive();
+      return;
+    }
+
+    try {
+      setIsDriveSyncing(true);
+      const driveData = await loadDatabaseFromDrive(token);
+
+      if (!driveData || (!driveData.itemsCSV && !driveData.categoriesCSV)) {
+        showToast('Pasta do FinanceControl criada no seu Drive! Nenhum dado anterior encontrado.');
+        setIsDriveConfirmModalOpen(true); // Prompt to save current data to drive
+        return;
+      }
+
+      if (driveData.items.length > 0) {
+        storageService.saveItemsCSV(driveData.itemsCSV);
+        setItems(driveData.items);
+      }
+
+      if (driveData.categories.length > 0) {
+        storageService.saveCategoriesCSV(driveData.categoriesCSV);
+        setCategories(driveData.categories);
+      }
+
+      setDriveFolderUrl(driveData.folderWebViewLink);
+      setDriveItemsFileId(driveData.itemsFileId);
+      setDriveCategoriesFileId(driveData.categoriesFileId);
+      setLastDriveSync(driveData.syncTimestamp);
+
+      showToast('Dados lidos com sucesso do seu Google Drive!');
+    } catch (err: any) {
+      console.error('Erro ao ler do Google Drive:', err);
+      showToast('Erro ao ler arquivos do Google Drive.');
+    } finally {
+      setIsDriveSyncing(false);
+    }
+  };
+
+  const handleTriggerDriveSave = () => {
+    const token = getDriveAccessToken();
+    if (!token) {
+      handleConnectDrive();
+      return;
+    }
+    // Open mandatory user confirmation modal before overwriting/updating Drive files
+    setIsDriveConfirmModalOpen(true);
+  };
+
+  const handleConfirmDriveSave = async () => {
+    const token = getDriveAccessToken();
+    if (!token) {
+      setIsDriveConfirmModalOpen(false);
+      await handleConnectDrive();
+      return;
+    }
+
+    try {
+      setIsDriveSaving(true);
+      const itemsCSV = itemsToCSV(items);
+      const categoriesCSV = categoriesToCSV(categories);
+
+      const result = await saveDatabaseToDrive(
+        itemsCSV,
+        categoriesCSV,
+        token,
+        driveItemsFileId,
+        driveCategoriesFileId
+      );
+
+      setDriveFolderUrl(result.folderWebViewLink);
+      setDriveItemsFileId(result.itemsFileId);
+      setDriveCategoriesFileId(result.categoriesFileId);
+      setLastDriveSync(new Date().toISOString());
+
+      setIsDriveConfirmModalOpen(false);
+      showToast('Arquivos items.csv e categories.csv gravados com sucesso no seu Google Drive!');
+    } catch (err: any) {
+      console.error('Erro ao gravar no Google Drive:', err);
+      showToast('Erro ao gravar arquivos no Google Drive.');
+    } finally {
+      setIsDriveSaving(false);
+    }
   };
 
   // Item Handlers
@@ -190,14 +398,43 @@ export default function App() {
     showToast('Backup exportado com sucesso!');
   };
 
-  const handleResetDefaults = () => {
-    if (window.confirm('Deseja restaurar os exemplos e categorias originais da família?')) {
-      storageService.resetToDefaults();
-      setCategories(storageService.getCategories());
+  // CSV Database Handlers
+  const handleViewCSV = (type: 'items' | 'categories') => {
+    setCsvModalType(type);
+    const text =
+      type === 'items'
+        ? storageService.getRawItemsCSV()
+        : storageService.getRawCategoriesCSV();
+    setRawCsvText(text);
+    setIsCsvModalOpen(true);
+  };
+
+  const handleSaveCSV = (type: 'items' | 'categories', content: string) => {
+    if (type === 'items') {
+      storageService.saveItemsCSV(content);
       setItems(storageService.getItems());
-      setUser(storageService.getUserProfile());
-      showToast('Dados de exemplo da família restaurados!');
+    } else {
+      storageService.saveCategoriesCSV(content);
+      setCategories(storageService.getCategories());
     }
+    setRawCsvText(content);
+    showToast(`Banco de dados ${type}.csv atualizado!`);
+  };
+
+  const handleDownloadCSV = (type: 'items' | 'categories') => {
+    storageService.downloadCSVFile(type);
+    showToast(`Download de ${type}.csv iniciado!`);
+  };
+
+  const handleImportCSVFile = (type: 'items' | 'categories', file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (text) {
+        handleSaveCSV(type, text);
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Filtered Items for Tables
@@ -252,13 +489,16 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 pb-20 md:pb-8">
         
-        {/* Top Header with User Google Badge (Screen 1, 3, 5) */}
+        {/* Top Header with User Google Badge & Google Drive Status */}
         <TopHeader
           user={user}
           activeView={activeView}
+          isDriveConnected={isDriveConnected}
+          isDriveSyncing={isDriveSyncing}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
           onNavigateToAccount={() => setActiveView('conta')}
           onOpenNewItem={() => handleOpenNewItem('gasto')}
+          onSyncDrive={isDriveConnected ? handleLoadFromDrive : handleConnectDrive}
         />
 
         {/* Dynamic Viewport Container */}
@@ -381,108 +621,32 @@ export default function App() {
             />
           )}
 
-          {/* VIEW: RELATÓRIOS */}
+          {/* VIEW: RELATÓRIOS (Interactive Recharts Reports) */}
           {activeView === 'relatorios' && (
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200 shadow-2xs space-y-6">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
-                  Relatório Financeiro da Família
-                </h2>
-                <p className="text-xs text-stone-500 mt-0.5">
-                  Demonstrativo consolidado dos ganhos, gastos e metas do lar
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl">
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 mb-1">
-                    <TrendingUp className="w-4 h-4" />
-                    <span>Total de Receitas</span>
-                  </div>
-                  <div className="text-2xl font-black font-mono text-emerald-700">
-                    {formatCurrency(
-                      items.filter((i) => i.tipo === 'ganho').reduce((acc, c) => acc + c.valor, 0)
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-4.5 bg-rose-50/70 border border-rose-200 rounded-2xl">
-                  <div className="flex items-center gap-2 text-xs font-bold text-rose-800 mb-1">
-                    <TrendingDown className="w-4 h-4" />
-                    <span>Total de Despesas</span>
-                  </div>
-                  <div className="text-2xl font-black font-mono text-rose-700">
-                    {formatCurrency(
-                      items.filter((i) => i.tipo === 'gasto').reduce((acc, c) => acc + c.valor, 0)
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-4.5 bg-sky-50/70 border border-sky-200 rounded-2xl">
-                  <div className="flex items-center gap-2 text-xs font-bold text-sky-800 mb-1">
-                    <Wallet className="w-4 h-4" />
-                    <span>Saldo Disponível</span>
-                  </div>
-                  <div className="text-2xl font-black font-mono text-sky-700">
-                    {formatCurrency(
-                      items.filter((i) => i.tipo === 'ganho').reduce((acc, c) => acc + c.valor, 0) -
-                        items.filter((i) => i.tipo === 'gasto').reduce((acc, c) => acc + c.valor, 0)
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-stone-100">
-                <h3 className="text-sm font-bold text-stone-800 mb-3">
-                  Distribuição de Gastos por Categoria
-                </h3>
-                <div className="space-y-2.5">
-                  {categories.map((cat) => {
-                    const catTotal = items
-                      .filter((i) => i.categoriaId === cat.id && i.tipo === 'gasto')
-                      .reduce((acc, c) => acc + c.valor, 0);
-                    const totalGastos = items
-                      .filter((i) => i.tipo === 'gasto')
-                      .reduce((acc, c) => acc + c.valor, 0) || 1;
-                    const pct = Math.round((catTotal / totalGastos) * 100);
-
-                    return (
-                      <div key={cat.id} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs font-semibold text-stone-700">
-                          <span className="flex items-center gap-2">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full"
-                              style={{ backgroundColor: cat.cor }}
-                            />
-                            <span>{cat.nome}</span>
-                          </span>
-                          <span className="font-mono text-stone-900">
-                            {formatCurrency(catTotal)} ({pct}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{ width: `${pct}%`, backgroundColor: cat.cor }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+            <FinancialReports items={items} categories={categories} />
           )}
 
-          {/* VIEW: CONTA DO USUÁRIO (Requested User Account Screen) */}
+          {/* VIEW: CONTA DO USUÁRIO (Requested User Account Screen & Drive Cloud DB) */}
           {activeView === 'conta' && (
             <UserAccountScreen
               user={user}
               items={items}
+              categoriesCount={categories.length}
+              isDriveConnected={isDriveConnected}
+              isDriveSyncing={isDriveSyncing}
+              driveFolderUrl={driveFolderUrl}
+              driveItemsFileId={driveItemsFileId}
+              driveCategoriesFileId={driveCategoriesFileId}
+              lastDriveSync={lastDriveSync}
               onUpdateUser={handleUpdateUser}
               onLogout={handleLogout}
               onExportBackup={handleExportBackup}
-              onResetDefaults={handleResetDefaults}
+              onViewCSV={handleViewCSV}
+              onDownloadCSV={handleDownloadCSV}
+              onImportCSVFile={handleImportCSVFile}
+              onConnectDrive={handleConnectDrive}
+              onLoadFromDrive={handleLoadFromDrive}
+              onTriggerDriveSave={handleTriggerDriveSave}
             />
           )}
 
@@ -531,6 +695,26 @@ export default function App() {
         }
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleConfirmDelete}
+      />
+
+      {/* MODAL 4: CSV Database Inspector and Editor */}
+      <CsvViewerModal
+        isOpen={isCsvModalOpen}
+        onClose={() => setIsCsvModalOpen(false)}
+        type={csvModalType}
+        rawCSV={rawCsvText}
+        onSaveCSV={handleSaveCSV}
+        onDownloadCSV={handleDownloadCSV}
+      />
+
+      {/* MODAL 5: Google Drive Overwrite / Sync Confirmation Dialog (Mandatory) */}
+      <DriveSyncConfirmModal
+        isOpen={isDriveConfirmModalOpen}
+        onClose={() => setIsDriveConfirmModalOpen(false)}
+        onConfirm={handleConfirmDriveSave}
+        itemsCount={items.length}
+        categoriesCount={categories.length}
+        isSaving={isDriveSaving}
       />
 
     </div>
