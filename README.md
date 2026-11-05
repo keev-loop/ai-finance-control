@@ -10,10 +10,12 @@ O **FinanceControl** é uma aplicação web desenvolvida para ajudar famílias e
 Muitas ferramentas financeiras tradicionais são excessivamente complexas ou focadas apenas em orçamentos individuais corporativos. O FinanceControl foi projetado com um visual acolhedor, linguagem em português do Brasil e foco na rotina da casa: divisão de contas, controle de ganhos, despesas mensais e metas para o futuro da família (reserva de emergência, reformas, férias e educação).
 
 ### Principais Benefícios:
-- **100% Client-Side:** Não exige criação de conta prévia ou servidor backend nesta fase; os dados são salvos de forma privada no `localStorage` do navegador do usuário.
-- **Foco Familiar:** Permite identificar qual morador ou membro da casa é o responsável pelo gasto, ganho ou meta.
-- **Alertas Proativos:** Avisa com delicadeza quando as despesas ultrapassam as receitas e estimula a criação de objetivos quando ainda não houver nenhum cadastrado.
-- **Portabilidade:** Inclui ferramentas para exportar backup em JSON e restaurar em qualquer momento ou outro computador.
+- **Autenticação com Google & Email:** Tela de login elegante com botão oficial "Continue with Google" e fallback por email/senha.
+- **Identidade e Perfil Conectado:** Identificação visual do usuário no topo (Avatar, Nome "Lucas S." e selo oficial do Google).
+- **Tela de Conta do Usuário:** Gestão completa do perfil, moradia ("Família Silva"), membros cadastrados, papel no lar e backups.
+- **Menu Lateral e Navegação Responsiva:** Sidebar completa no desktop (Início, Ganhos, Gastos, Objetivos, Categorias, Relatórios, Conta, Sair) e navegação mobile com botão flutuante "+".
+- **Visual Fiel ao Design (Família Finanças):** Grade de categorias com cartões em tons pastéis e ícones temáticos (Food, Housing, Travel, Leisure, Education, etc.).
+- **100% Client-Side:** Persistência no `localStorage` do navegador com privacidade total e sem necessidade de backend inicial.
 
 ---
 

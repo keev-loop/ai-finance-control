@@ -7,10 +7,33 @@ export type ItemStatus =
   | 'em_andamento'
   | 'atingido';
 
+export type ActiveView = 
+  | 'inicio' 
+  | 'ganhos' 
+  | 'gastos' 
+  | 'objetivos' 
+  | 'categorias' 
+  | 'relatorios' 
+  | 'conta';
+
+export interface UserProfile {
+  id: string;
+  nome: string;
+  email: string;
+  avatarUrl: string;
+  provider: 'google' | 'email';
+  nomeFamilia: string;
+  papel: string;
+  conectadoDesde: string;
+  moradores: string[];
+}
+
 export interface FinanceCategory {
   id: string;
   nome: string;
   cor: string;
+  corFundo?: string; // Pastel background for grid view
+  icone?: string; // lucide icon identifier
   descricao?: string;
   criadaEm: string;
 }

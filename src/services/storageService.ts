@@ -1,124 +1,121 @@
-import { FinanceCategory, FinanceItem } from '../types/finance';
+import { FinanceCategory, FinanceItem, UserProfile } from '../types/finance';
 
 const STORAGE_KEYS = {
-  CATEGORIES: 'financecontrol_categories_v1',
-  ITEMS: 'financecontrol_items_v1',
-  INITIALIZED: 'financecontrol_initialized_v1',
+  CATEGORIES: 'financecontrol_categories_v2',
+  ITEMS: 'financecontrol_items_v2',
+  INITIALIZED: 'financecontrol_initialized_v2',
+  USER_PROFILE: 'financecontrol_user_profile_v2',
+  AUTH_LOGGED_IN: 'financecontrol_auth_logged_in_v2',
+};
+
+export const DEFAULT_USER: UserProfile = {
+  id: 'usr-lucas-silva',
+  nome: 'Lucas Silva',
+  email: 'nkvspl@gmail.com',
+  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+  provider: 'google',
+  nomeFamilia: 'Família Silva',
+  papel: 'Administrador do Lar',
+  conectadoDesde: '07/07/2023',
+  moradores: ['Lucas Silva', 'Mariana Silva', 'Enzo Silva'],
 };
 
 export const DEFAULT_CATEGORIES: FinanceCategory[] = [
   {
-    id: 'cat-moradia',
-    nome: 'Moradia & Contas',
-    cor: '#0ea5e9', // sky
-    descricao: 'Aluguel, condomínio, luz, água, internet e gás',
+    id: 'cat-food',
+    nome: 'Food / Alimentação',
+    cor: '#e11d48',
+    corFundo: '#ffe4e6', // pastel pink
+    icone: 'utensils',
+    descricao: 'Compras de supermercado, feira, refeições e padaria',
     criadaEm: new Date().toISOString(),
   },
   {
-    id: 'cat-alimentacao',
-    nome: 'Alimentação & Supermercado',
-    cor: '#f59e0b', // amber
-    descricao: 'Compras de supermercado, feira, padaria e açougue',
+    id: 'cat-housing',
+    nome: 'Housing / Moradia',
+    cor: '#ea580c',
+    corFundo: '#ffedd5', // pastel peach
+    icone: 'home',
+    descricao: 'Aluguel, condomínio, luz, água, gás e internet',
     criadaEm: new Date().toISOString(),
   },
   {
-    id: 'cat-transporte',
-    nome: 'Transporte & Veículo',
-    cor: '#64748b', // slate
-    descricao: 'Combustível, manutenção do carro, transporte público e aplicativos',
+    id: 'cat-travel',
+    nome: 'Travel / Viagens',
+    cor: '#0284c7',
+    corFundo: '#e0f2fe', // pastel sky blue
+    icone: 'plane',
+    descricao: 'Passagens, hospedagem e passeios de férias da família',
     criadaEm: new Date().toISOString(),
   },
   {
-    id: 'cat-saude',
-    nome: 'Saúde & Farmácia',
-    cor: '#ef4444', // red
-    descricao: 'Consultas médicas, convênio, remédios e exames',
+    id: 'cat-leisure',
+    nome: 'Leisure / Lazer',
+    cor: '#16a34a',
+    corFundo: '#dcfce7', // pastel mint green
+    icone: 'gamepad-2',
+    descricao: 'Cinemas, jogos, streaming e diversão familiar',
     criadaEm: new Date().toISOString(),
   },
   {
-    id: 'cat-lazer',
-    nome: 'Lazer & Família',
-    cor: '#8b5cf6', // violet
-    descricao: 'Passeios familiares, cinema, restaurantes e streaming',
+    id: 'cat-education',
+    nome: 'Education / Educação',
+    cor: '#7c3aed',
+    corFundo: '#f3e8ff', // pastel lavender
+    icone: 'graduation-cap',
+    descricao: 'Mensalidades escolares, cursos, faculdade e livros',
     criadaEm: new Date().toISOString(),
   },
   {
-    id: 'cat-educacao',
-    nome: 'Educação & Cursos',
-    cor: '#06b6d4', // cyan
-    descricao: 'Escola das crianças, livros, faculdade e cursos',
+    id: 'cat-health',
+    nome: 'Health / Saúde',
+    cor: '#dc2626',
+    corFundo: '#fee2e2', // pastel soft red
+    icone: 'heart-pulse',
+    descricao: 'Farmácia, consultas médicas e plano de saúde',
     criadaEm: new Date().toISOString(),
   },
   {
-    id: 'cat-renda',
-    nome: 'Salário & Rendas',
-    cor: '#10b981', // emerald
-    descricao: 'Salários dos moradores, adiantamentos e rendas extras',
+    id: 'cat-relax',
+    nome: 'Relax / Bem-Estar',
+    cor: '#9333ea',
+    corFundo: '#fae8ff', // pastel lilac
+    icone: 'sparkles',
+    descricao: 'Autocuidado, academia e descanso',
     criadaEm: new Date().toISOString(),
   },
   {
-    id: 'cat-reserva',
-    nome: 'Reserva & Investimentos',
-    cor: '#14b8a6', // teal
-    descricao: 'Poupança familiar, reserva de emergência e metas de longo prazo',
+    id: 'cat-others',
+    nome: 'Others / Outros',
+    cor: '#be123c',
+    corFundo: '#ffe4e6', // pastel salmon
+    icone: 'briefcase',
+    descricao: 'Despesas diversas e imprevistos cotidianos',
     criadaEm: new Date().toISOString(),
   },
 ];
 
-// Data helper to generate dynamic recent dates
-const getRecentDate = (daysOffset: number): string => {
-  const d = new Date();
-  d.setDate(d.getDate() + daysOffset);
-  return d.toISOString().split('T')[0];
-};
-
 export const DEFAULT_ITEMS: FinanceItem[] = [
   {
     id: 'item-1',
-    titulo: 'Salário Familiar Mensal',
-    descricao: 'Renda principal dos moradores da casa para o mês corrente',
-    categoriaId: 'cat-renda',
-    valor: 7500,
-    data: getRecentDate(-10),
+    titulo: 'Salário Mensal',
+    descricao: 'Recebimento do salário principal da casa',
+    categoriaId: 'cat-housing',
+    valor: 12500,
+    data: '2023-07-07',
     tipo: 'ganho',
     status: 'recebido',
-    responsavel: 'Todos da casa',
+    responsavel: 'Lucas Silva',
     criadoEm: new Date().toISOString(),
     atualizadoEm: new Date().toISOString(),
   },
   {
     id: 'item-2',
-    titulo: 'Trabalho Freelance Extra',
-    descricao: 'Projeto de consultoria pontual realizado no fim de semana',
-    categoriaId: 'cat-renda',
-    valor: 1200,
-    data: getRecentDate(-4),
-    tipo: 'ganho',
-    status: 'recebido',
-    responsavel: 'Lucas',
-    criadoEm: new Date().toISOString(),
-    atualizadoEm: new Date().toISOString(),
-  },
-  {
-    id: 'item-3',
-    titulo: 'Aluguel e Condomínio',
-    descricao: 'Pagamento fixo da habitação da família',
-    categoriaId: 'cat-moradia',
-    valor: 2400,
-    data: getRecentDate(-5),
-    tipo: 'gasto',
-    status: 'pago',
-    responsavel: 'Mãe & Pai',
-    criadoEm: new Date().toISOString(),
-    atualizadoEm: new Date().toISOString(),
-  },
-  {
-    id: 'item-4',
-    titulo: 'Supermercado Mensal da Casa',
-    descricao: 'Compra do mês com itens de despensa, limpeza e hortifrúti',
-    categoriaId: 'cat-alimentacao',
-    valor: 1850,
-    data: getRecentDate(-3),
+    titulo: 'Mercado do Mês',
+    descricao: 'Compras de supermercado e despensa familiar',
+    categoriaId: 'cat-food',
+    valor: 8950,
+    data: '2023-07-07',
     tipo: 'gasto',
     status: 'pago',
     responsavel: 'Família',
@@ -126,54 +123,54 @@ export const DEFAULT_ITEMS: FinanceItem[] = [
     atualizadoEm: new Date().toISOString(),
   },
   {
+    id: 'item-3',
+    titulo: 'Depósito p/ Viagem',
+    descricao: 'Meta de economia para férias de fim de ano da família',
+    categoriaId: 'cat-travel',
+    valor: 11500,
+    data: '2023-02-17',
+    tipo: 'objetivo',
+    status: 'em_andamento',
+    responsavel: 'Família Silva',
+    criadoEm: new Date().toISOString(),
+    atualizadoEm: new Date().toISOString(),
+  },
+  {
+    id: 'item-4',
+    titulo: 'Freelance Design',
+    descricao: 'Consultoria e projeto extra de design de interfaces',
+    categoriaId: 'cat-others',
+    valor: 1500,
+    data: '2023-07-10',
+    tipo: 'ganho',
+    status: 'recebido',
+    responsavel: 'Lucas Silva',
+    criadoEm: new Date().toISOString(),
+    atualizadoEm: new Date().toISOString(),
+  },
+  {
     id: 'item-5',
-    titulo: 'Conta de Energia Elétrica e Água',
-    descricao: 'Faturas de consumo de luz e saneamento com vencimento próximo',
-    categoriaId: 'cat-moradia',
-    valor: 430,
-    data: getRecentDate(3),
+    titulo: 'Almoço Sábado',
+    descricao: 'Almoço com a família fora de casa',
+    categoriaId: 'cat-food',
+    valor: 122,
+    data: '2023-07-15',
     tipo: 'gasto',
-    status: 'pendente',
-    responsavel: 'Casa',
+    status: 'pago',
+    responsavel: 'Lucas & Mariana',
     criadoEm: new Date().toISOString(),
     atualizadoEm: new Date().toISOString(),
   },
   {
     id: 'item-6',
-    titulo: 'Combustível do Carro Familiar',
-    descricao: 'Abastecimento para ida ao trabalho e rotina da semana',
-    categoriaId: 'cat-transporte',
-    valor: 320,
-    data: getRecentDate(-1),
-    tipo: 'gasto',
-    status: 'pago',
-    responsavel: 'Pai',
-    criadoEm: new Date().toISOString(),
-    atualizadoEm: new Date().toISOString(),
-  },
-  {
-    id: 'item-7',
-    titulo: 'Reserva de Emergência Familiar',
-    descricao: 'Meta de acumular 6 meses de custos fixos essenciais em segurança',
-    categoriaId: 'cat-reserva',
-    valor: 15000,
-    data: getRecentDate(90),
+    titulo: 'Reserva de Emergência 6 Meses',
+    descricao: 'Fundo garantidor familiar aplicado com liquidez diária',
+    categoriaId: 'cat-housing',
+    valor: 10000,
+    data: '2023-12-31',
     tipo: 'objetivo',
     status: 'em_andamento',
-    responsavel: 'Família Toda',
-    criadoEm: new Date().toISOString(),
-    atualizadoEm: new Date().toISOString(),
-  },
-  {
-    id: 'item-8',
-    titulo: 'Viagem de Férias da Casa',
-    descricao: 'Planejamento financeiro para descanso e passeio no final de ano',
-    categoriaId: 'cat-lazer',
-    valor: 4500,
-    data: getRecentDate(180),
-    tipo: 'objetivo',
-    status: 'em_andamento',
-    responsavel: 'Família Toda',
+    responsavel: 'Todos da casa',
     criadoEm: new Date().toISOString(),
     atualizadoEm: new Date().toISOString(),
   },
@@ -184,7 +181,6 @@ class StorageService {
     return typeof window !== 'undefined' && !!window.localStorage;
   }
 
-  // Initialize defaults if first time
   public initialize(): void {
     if (!this.isBrowser()) return;
 
@@ -192,7 +188,40 @@ class StorageService {
     if (!initialized) {
       this.saveCategories(DEFAULT_CATEGORIES);
       this.saveItems(DEFAULT_ITEMS);
+      this.saveUserProfile(DEFAULT_USER);
+      this.setLoggedIn(true);
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
+    }
+  }
+
+  // --- AUTH & USER PROFILE ---
+  public isLoggedIn(): boolean {
+    if (!this.isBrowser()) return true;
+    const val = localStorage.getItem(STORAGE_KEYS.AUTH_LOGGED_IN);
+    return val !== null ? val === 'true' : true; // Default logged in for smooth immediate preview
+  }
+
+  public setLoggedIn(loggedIn: boolean): void {
+    if (!this.isBrowser()) return;
+    localStorage.setItem(STORAGE_KEYS.AUTH_LOGGED_IN, String(loggedIn));
+  }
+
+  public getUserProfile(): UserProfile {
+    if (!this.isBrowser()) return DEFAULT_USER;
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+      return data ? JSON.parse(data) : DEFAULT_USER;
+    } catch {
+      return DEFAULT_USER;
+    }
+  }
+
+  public saveUserProfile(profile: UserProfile): void {
+    if (!this.isBrowser()) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
+    } catch (e) {
+      console.error('Erro ao salvar perfil do usuário:', e);
     }
   }
 
@@ -254,9 +283,8 @@ class StorageService {
 
     this.saveCategories(filtered);
 
-    // If there are items with this category, keep them safe by setting to first available or leaving fallback
     const items = this.getItems();
-    const fallbackCategory = filtered[0]?.id || 'cat-outros';
+    const fallbackCategory = filtered[0]?.id || 'cat-food';
     let countReassigned = 0;
 
     const updatedItems = items.map((item) => {
@@ -306,7 +334,7 @@ class StorageService {
       criadoEm: new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
     };
-    items.unshift(newItem); // most recent at front
+    items.unshift(newItem);
     this.saveItems(items);
     return newItem;
   }
@@ -333,32 +361,35 @@ class StorageService {
     return true;
   }
 
-  // Restore initial realistic demo data
   public resetToDefaults(): void {
     if (!this.isBrowser()) return;
     this.saveCategories(DEFAULT_CATEGORIES);
     this.saveItems(DEFAULT_ITEMS);
+    this.saveUserProfile(DEFAULT_USER);
+    this.setLoggedIn(true);
   }
 
-  // Export JSON backup for household
   public exportData(): string {
     const payload = {
-      version: 1,
-      appName: 'FinanceControl',
+      version: 2,
+      appName: 'Família Finanças (FinanceControl)',
       exportedAt: new Date().toISOString(),
+      user: this.getUserProfile(),
       categories: this.getCategories(),
       items: this.getItems(),
     };
     return JSON.stringify(payload, null, 2);
   }
 
-  // Import JSON backup
   public importData(jsonData: string): boolean {
     try {
       const parsed = JSON.parse(jsonData);
       if (Array.isArray(parsed.categories) && Array.isArray(parsed.items)) {
         this.saveCategories(parsed.categories);
         this.saveItems(parsed.items);
+        if (parsed.user) {
+          this.saveUserProfile(parsed.user);
+        }
         return true;
       }
       return false;
